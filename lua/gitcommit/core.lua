@@ -1,5 +1,7 @@
--- lua/gitcommit/core.lua
+-- lua/gitcommit /core.lua
+local curl = require("plenary.curl")
 local config = require("gitcommit.config")
+
 local M = {}
 
 local function run_command(cmd)
@@ -47,7 +49,12 @@ function M.check_git_status()
 end
 
 function M.generate_commit_message(diff, callback)
-	local Job = require("plenary.job")
+	local api_key = config.options.api_key
+
+	if not api_key then
+		callback("❌ Geen OPENAI_API_KEY gevonden in environment")
+		return
+	end
 	local payload = vim.fn.json_encode({
 		model = config.options.model,
 		messages = {
@@ -57,42 +64,32 @@ function M.generate_commit_message(diff, callback)
 		temperature = config.options.temperature,
 	})
 
-	Job
-		:new({
-			command = "curl",
-			args = {
-				"-s",
-				"-X",
-				"POST",
-				"-H",
-				"Content-Type: application/json",
-				"-H",
-				"Authorization: Bearer " .. os.getenv("OPENAI_API_KEY"),
-				"--data",
-				payload,
-				"https://api.openai.com/v1/chat/completions",
-			},
-			on_exit = function(j, return_val)
-				if return_val == 0 then
-					local ok, decoded = pcall(vim.fn.json_decode, table.concat(j:result(), "\n"))
-					if ok and decoded and decoded.choices and decoded.choices[1] then
-						callback(decoded.choices[1].message.content)
-					else
-						callback("Auto-commit (OpenAI gaf geen geldig antwoord)")
-					end
-				else
-					callback("Auto-commit (curl fout)")
-				end
-			end,
-		})
-		:start()
+	callback(" debug payload: " .. payload)
+	local response = curl.post("https://api.openai.com/v1/chat/completions", {
+		headers = {
+			["Authorization"] = "Bearer " .. api_key,
+			["Content-Type"] = "application/json",
+		},
+		body = vim.fn.json_encode(payload),
+	})
+
+	if response.status == 200 then
+		local ok, decoded = pcall(vim.fn.json_decode, response.body)
+		if ok and decoded and decoded.choices and decoded.choices[1] then
+			callback(decoded.choices[1].message.content)
+		else
+			callback("❌ Ongeldig antwoord van OpenAI API")
+		end
+	else
+		callback("❌ HTTP fout: " .. tostring(response.status))
+	end
 end
 
 function M.run()
 	if not M.check_git_status() then
 		return
 	end
-	local diff = run_command("git diff")
+	local diff = run_command("git diff HEAD")
 	M.generate_commit_message(diff, function(msg)
 		print("\n📦 Commit message:\n" .. msg)
 	end)

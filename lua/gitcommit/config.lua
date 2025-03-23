@@ -1,11 +1,12 @@
--- lua/gitcommit/config.lua
+-- lua/gitcommitai/config.lua
 local M = {}
 
 M.options = {
-	model = "gpt-3.5-turbo",
+	model = "gpt-4o-mini",
 	temperature = 0.7,
 	system_prompt = "Je bent een AI die behulpzame git commit messages genereert.",
 	user_prompt = "Genereer een duidelijke commit message op basis van deze git diff:",
+	api_key = os.getenv("OPENAI_API_KEY"),
 }
 
 function M.setup(opts)
