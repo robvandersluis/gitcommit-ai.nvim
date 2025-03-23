@@ -1,5 +1,4 @@
 # gitcommit-ai.nvim
-mooi
 🚀 A Neovim plugin that generates Git commit messages using OpenAI.
 
 Save time and write better commit messages with the help of AI. This plugin analyzes your Git diff and generates a clear, consistent, and categorized commit message based on your changes.

@@ -45,9 +45,9 @@ function M.generate_commit_message(diff, callback)
 end
 
 function M.check_git_status()
-	if vim.fn.isdirectory(".git") == 0 then
-		return false, "🚫 No Git repository found."
-	end
+	-- if vim.fn.isdirectory(".git") == 0 then
+	-- 	return false, "🚫 No Git repository found."
+	-- end
 
 	local status = run_command("git status --porcelain -b")
 	if status:find("%[behind") then
@@ -72,7 +72,7 @@ function M.check_git_status()
 	if #lines == 1 then
 		return false, "✅ No changes to commit."
 	end
-	-- print("🔍 Gewijzigde bestanden:")
+	-- print("🔍 File Changes :")
 	-- for i = 2, #lines do
 	-- 	print("  " .. lines[i])
 	-- end
@@ -103,13 +103,13 @@ local function show_floating_message(message)
 		if vim.api.nvim_win_is_valid(win) then
 			vim.api.nvim_win_close(win, true)
 		end
-	end, 2000)
+	end, 3000)
 end
 --[[
 📌 
 ✅ Commit
 🚫 Cancel
-	📌 	]]
+]]
 
 function M.show_commit_ui(message)
 	local buf = vim.api.nvim_create_buf(false, true)
@@ -157,9 +157,9 @@ function M.show_commit_ui(message)
 	local keyline = #lines - 1
 	local keymap = {
 		{ "[e]", "Keyword" },
-		{ "Edit", "Normal" },
+		{ "Edit   ", "Normal" },
 		{ "[c]", "Keyword" },
-		{ "Commit", "Normal" },
+		{ "Commit   ", "Normal" },
 		{ "[q]", "Keyword" },
 		{ "Quit", "Normal" },
 	}
