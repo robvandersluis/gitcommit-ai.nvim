@@ -105,35 +105,75 @@ local function show_floating_message(message)
 		end
 	end, 2000)
 end
+--[[
+📌 
+✅ Commit
+🚫 Cancel
+	📌 	]]
 
 function M.show_commit_ui(message)
 	local buf = vim.api.nvim_create_buf(false, true)
 	local lines = {}
-	table.insert(lines, "👃 Generated commit message:")
+
+	table.insert(lines, "📌 Generated commit message:")
+	table.insert(lines, "")
 
 	local mlines = vim.split(message, "\n")
-	table.insert(lines, "")
 	for _, line in ipairs(mlines) do
-		table.insert(lines, " " .. line)
+		table.insert(lines, "  " .. line)
 	end
-	table.insert(lines, " ───────────────────────────── ")
-	table.insert(lines, " [e] Edit  [c] Commit  [q] Quit ")
+
+	table.insert(lines, "")
+	table.insert(
+		lines,
+		"─────────────────────────────────────────────"
+	)
+	table.insert(lines, " [e] Edit    [c] Commit    [q] Quit ")
+
 	vim.api.nvim_buf_set_lines(buf, 0, -1, false, lines)
 
+	-- Window layout
 	local width = math.floor(vim.o.columns * 0.6)
-	local height = math.max(20, #lines + 2)
+	local height = #lines + 2
 	local col = math.floor((vim.o.columns - width) / 2)
+	local row = math.floor((vim.o.lines - height) / 2)
 
 	local win = vim.api.nvim_open_win(buf, true, {
 		relative = "editor",
 		width = width,
 		height = height,
 		col = col,
-		row = (vim.o.lines - height) / 2,
+		row = row,
 		style = "minimal",
 		border = "rounded",
 	})
 
+	-- Styling via extmarks
+	local ns = vim.api.nvim_create_namespace("commit-ui")
+	vim.api.nvim_buf_add_highlight(buf, ns, "Title", 0, 0, -1)
+	vim.api.nvim_buf_add_highlight(buf, ns, "Comment", #lines - 2, 0, -1)
+
+	-- Highlight key shortcuts
+	local keyline = #lines - 1
+	local keymap = {
+		{ "[e]", "Keyword" },
+		{ "Edit", "Normal" },
+		{ "[c]", "Keyword" },
+		{ "Commit", "Normal" },
+		{ "[q]", "Keyword" },
+		{ "Quit", "Normal" },
+	}
+
+	local col_pos = 1
+	for _, pair in ipairs(keymap) do
+		local text, hl = unpack(pair)
+		local start_col = col_pos
+		local end_col = start_col + #text
+		vim.api.nvim_buf_add_highlight(buf, ns, hl, keyline, start_col - 1, end_col)
+		col_pos = end_col + 1
+	end
+
+	-- Keymaps
 	vim.keymap.set("n", "q", function()
 		vim.api.nvim_win_close(win, true)
 	end, { buffer = buf, silent = true })
