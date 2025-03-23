@@ -106,6 +106,49 @@ local function show_floating_message(message)
 	end, 2000)
 end
 
+function M.show_commit_ui(message)
+	local buf = vim.api.nvim_create_buf(false, true)
+	local lines = vim.split(message, "\n")
+	table.insert(lines, "")
+	table.insert(lines, " ───────────────────────────── ")
+	table.insert(lines, " [e] Edit  [c] Commit  [q] Quit ")
+	vim.api.nvim_buf_set_lines(buf, 0, -1, false, lines)
+
+	local width = 80
+	local height = 15
+	local win = vim.api.nvim_open_win(buf, true, {
+		relative = "editor",
+		width = width,
+		height = height,
+		col = (vim.o.columns - width) / 2,
+		row = (vim.o.lines - height) / 2,
+		style = "minimal",
+		border = "rounded",
+	})
+
+	vim.keymap.set("n", "q", function()
+		vim.api.nvim_win_close(win, true)
+	end, { buffer = buf, silent = true })
+
+	vim.keymap.set("n", "c", function()
+		vim.api.nvim_win_close(win, true)
+		M.commit_with_message(message)
+	end, { buffer = buf, silent = true })
+
+	vim.keymap.set("n", "e", function()
+		vim.api.nvim_win_close(win, true)
+		M.open_commit_buffer(message)
+	end, { buffer = buf, silent = true })
+end
+
+function M.commit_with_message(msg)
+	local tmpfile = vim.fn.tempname()
+	vim.fn.system({ "git", "add", "-A" })
+	vim.fn.writefile(vim.split(msg, "\n"), tmpfile)
+	local out = vim.fn.system({ "git", "commit", "-F", tmpfile })
+	vim.notify(out, vim.log.levels.INFO)
+	M.prompt_push()
+end
 function M.run()
 	local ok, err = M.check_git_status()
 	if not ok then
@@ -115,54 +158,55 @@ function M.run()
 
 	local diff = run_command("git diff HEAD")
 	M.generate_commit_message(diff, function(msg)
-		--print("\n📦 Commit message:\n" .. msg)
-
-		local tmpfile = vim.fn.tempname()
-		-- Open commit message in new buffer
-		local buf = vim.api.nvim_create_buf(true, false) -- listed, not scratch
-		vim.api.nvim_buf_set_lines(buf, 0, -1, false, vim.fn.split(msg, "\n"))
-		vim.api.nvim_buf_set_name(buf, tmpfile)
-		vim.bo[buf].filetype = "gitcommit"
-		vim.bo[buf].bufhidden = "wipe"
-		--vim.bo[buf].buftype = "nofile"
-		-- open buffer in new window
-		vim.api.nvim_set_current_buf(buf)
-
-		vim.keymap.set("n", "q", function()
-			vim.notify("❌ Commit geannuleerd door gebruiker.", vim.log.levels.WARN)
-			vim.api.nvim_buf_delete(buf, { force = true })
-		end, { buffer = buf, silent = true })
-
-		-- Auto-command: save and close buffer
-		vim.api.nvim_create_autocmd("BufWritePost", {
-			buffer = buf,
-			once = true,
-			callback = function()
-				-- Stage alles voor commit
-				vim.fn.system({ "git", "add", "-A" })
-
-				vim.fn.writefile(vim.api.nvim_buf_get_lines(buf, 0, -1, false), tmpfile)
-
-				-- Commit message
-				local out = vim.fn.system({ "git", "commit", "-F", tmpfile })
-				vim.notify(out, vim.log.levels.INFO)
-
-				-- Close buffer
-				vim.api.nvim_buf_delete(buf, { force = true })
-
-				vim.schedule(function()
-					vim.ui.select({ "Ja", "Nee" }, { prompt = "Wil je nu pushen?" }, function(choice)
-						if choice == "Ja" then
-							local push_out = vim.fn.system({ "git", "push" })
-							vim.notify(push_out, vim.log.levels.INFO)
-						else
-							vim.notify("🚀 Push overgeslagen.", vim.log.levels.INFO)
-						end
-					end)
-				end)
-			end,
-		})
+		M.show_commit_ui(msg)
 	end)
 end
 
+function M.open_commit_buffer(msg)
+	local tmpfile = vim.fn.tempname()
+	local buf = vim.api.nvim_create_buf(true, false)
+	vim.api.nvim_buf_set_lines(buf, 0, -1, false, vim.fn.split(msg, "\n"))
+	vim.api.nvim_buf_set_name(buf, tmpfile)
+	vim.bo[buf].filetype = "gitcommit"
+	vim.bo[buf].bufhidden = "wipe"
+	vim.api.nvim_set_current_buf(buf)
+
+	vim.keymap.set("n", "q", function()
+		vim.notify("❌ Commit canceled.", vim.log.levels.WARN)
+		vim.api.nvim_buf_delete(buf, { force = true })
+	end, { buffer = buf, silent = true })
+
+	vim.api.nvim_create_autocmd("BufWritePost", {
+		buffer = buf,
+		once = true,
+		callback = function()
+			M.commit_from_buffer(buf, tmpfile)
+		end,
+	})
+end
+
+function M.commit_from_buffer(buf, tmpfile)
+	vim.fn.system({ "git", "add", "-A" })
+	vim.fn.writefile(vim.api.nvim_buf_get_lines(buf, 0, -1, false), tmpfile)
+
+	local out = vim.fn.system({ "git", "commit", "-F", tmpfile })
+	vim.notify(out, vim.log.levels.INFO)
+
+	vim.api.nvim_buf_delete(buf, { force = true })
+
+	M.prompt_push()
+end
+
+function M.prompt_push()
+	vim.schedule(function()
+		vim.ui.select({ "Yes", "No" }, { prompt = "Push to Remote?" }, function(choice)
+			if choice == "Yes" then
+				local push_out = vim.fn.system({ "git", "push" })
+				vim.notify(push_out, vim.log.levels.INFO)
+			else
+				vim.notify("🚀 Push skipped.", vim.log.levels.INFO)
+			end
+		end)
+	end)
+end
 return M
