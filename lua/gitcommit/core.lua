@@ -9,9 +9,10 @@ local function run_command(cmd)
 end
 
 function M.generate_commit_message(diff, callback)
-	local api_key = vim.fn.getenv("OPENAI_API_KEY")
+	local api_key = config.options.api_key or os.getenv("OPENAI_API_KEY")
+
 	if not api_key then
-		callback("❌ Geen OPENAI_API_KEY gevonden in environment")
+		callback("❌ Geen OPENAI_API_KEY gevonden in environment en settings.api_key")
 		return
 	end
 	local payload = {
@@ -44,10 +45,10 @@ function M.generate_commit_message(diff, callback)
 end
 
 function M.check_git_status()
-	if vim.fn.isdirectory(".git") == 0 then
-		print("🚫 Geen Git-repository gevonden.")
-		return false
-	end
+	-- if vim.fn.isdirectory(".git") == 0 then
+	-- 	print("🚫 Geen Git-repository gevonden.")
+	-- 	return false
+	-- end
 
 	local status = run_command("git status --porcelain -b")
 	if status:find("%[behind") then
@@ -89,7 +90,33 @@ function M.run()
 	end
 	local diff = run_command("git diff HEAD")
 	M.generate_commit_message(diff, function(msg)
-		print("\n📦 Commit message:\n" .. msg)
+		--print("\n📦 Commit message:\n" .. msg)
+
+		-- Open commit message in new buffer
+		local buf = vim.api.nvim_create_buf(true, false) -- listed, not scratch
+		vim.api.nvim_buf_set_lines(buf, 0, -1, false, vim.fn.split(msg, "\n"))
+
+		-- open buffer in new window
+		vim.api.nvim_set_current_buf(buf)
+
+		local tmpfile = vim.fn.tempname()
+		-- Auto-command: save and close buffer
+		vim.api.nvim_create_autocmd("BufWritePost", {
+			buffer = buf,
+			once = true,
+			callback = function()
+				vim.fn.writefile(vim.api.nvim_buf_get_lines(buf, 0, -1, false), tmpfile)
+
+				-- Commit message
+				local out = vim.fn.system({ "git", "commit", "-F", tmpfile })
+				vim.notify(out, vim.log.levels.INFO)
+			end,
+		})
+
+		vim.api.nvim_buf_set_name(buf, "AI Commit Message")
+		vim.bo[buf].filetype = "gitcommit"
+		vim.bo[buf].buftype = ""
+		vim.bo[buf].bufhidden = "wipe"
 	end)
 end
 
