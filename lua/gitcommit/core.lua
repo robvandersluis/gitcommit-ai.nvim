@@ -128,6 +128,11 @@ function M.run()
 		-- open buffer in new window
 		vim.api.nvim_set_current_buf(buf)
 
+		vim.keymap.set("n", "q", function()
+			vim.notify("❌ Commit geannuleerd door gebruiker.", vim.log.levels.WARN)
+			vim.api.nvim_buf_delete(buf, { force = true })
+		end, { buffer = buf, silent = true })
+
 		-- Auto-command: save and close buffer
 		vim.api.nvim_create_autocmd("BufWritePost", {
 			buffer = buf,
@@ -144,6 +149,17 @@ function M.run()
 
 				-- Close buffer
 				vim.api.nvim_buf_delete(buf, { force = true })
+
+				vim.schedule(function()
+					vim.ui.select({ "Ja", "Nee" }, { prompt = "Wil je nu pushen?" }, function(choice)
+						if choice == "Ja" then
+							local push_out = vim.fn.system({ "git", "push" })
+							vim.notify(push_out, vim.log.levels.INFO)
+						else
+							vim.notify("🚀 Push overgeslagen.", vim.log.levels.INFO)
+						end
+					end)
+				end)
 			end,
 		})
 	end)
