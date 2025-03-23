@@ -92,17 +92,17 @@ function M.run()
 	M.generate_commit_message(diff, function(msg)
 		--print("\n📦 Commit message:\n" .. msg)
 
+		local tmpfile = vim.fn.tempname()
 		-- Open commit message in new buffer
 		local buf = vim.api.nvim_create_buf(true, false) -- listed, not scratch
 		vim.api.nvim_buf_set_lines(buf, 0, -1, false, vim.fn.split(msg, "\n"))
-		vim.api.nvim_buf_set_name(buf, "AI Commit Message")
+		vim.api.nvim_buf_set_name(buf, tmpfile)
 		vim.bo[buf].filetype = "gitcommit"
 		vim.bo[buf].bufhidden = "wipe"
-
+		--vim.bo[buf].buftype = "nofile"
 		-- open buffer in new window
 		vim.api.nvim_set_current_buf(buf)
 
-		local tmpfile = vim.fn.tempname()
 		-- Auto-command: save and close buffer
 		vim.api.nvim_create_autocmd("BufWritePost", {
 			buffer = buf,
