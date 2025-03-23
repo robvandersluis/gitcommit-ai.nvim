@@ -1,11 +1,46 @@
 -- lua/gitcommit /core.lua
-local curl = require("plenary.curl")
 local config = require("gitcommit.config")
+local curl = require("plenary.curl")
 
 local M = {}
 
 local function run_command(cmd)
 	return vim.fn.system(cmd)
+end
+
+function M.generate_commit_message(diff, callback)
+	local api_key = vim.fn.getenv("OPENAI_API_KEY")
+	if not api_key then
+		callback("❌ Geen OPENAI_API_KEY gevonden in environment")
+		return
+	end
+	local payload = {
+		model = config.options.model,
+		messages = {
+			{ role = "system", content = config.options.system_prompt },
+			{ role = "user", content = config.options.user_prompt .. "\n\n" .. diff },
+		},
+		temperature = config.options.temperature,
+	}
+
+	local response = curl.post("https://api.openai.com/v1/chat/completions", {
+		headers = {
+			["Authorization"] = "Bearer " .. api_key,
+			["Content-Type"] = "application/json",
+		},
+		body = vim.fn.json_encode(payload),
+	})
+
+	if response.status == 200 then
+		local ok, decoded = pcall(vim.fn.json_decode, response.body)
+		if ok and decoded and decoded.choices and decoded.choices[1] then
+			callback(decoded.choices[1].message.content)
+		else
+			callback("❌ Ongeldig antwoord van OpenAI API")
+		end
+	else
+		callback("❌ HTTP fout: " .. tostring(response.status))
+	end
 end
 
 function M.check_git_status()
@@ -46,43 +81,6 @@ function M.check_git_status()
 	end
 
 	return true
-end
-
-function M.generate_commit_message(diff, callback)
-	local api_key = config.options.api_key
-
-	if not api_key then
-		callback("❌ Geen OPENAI_API_KEY gevonden in environment")
-		return
-	end
-	local payload = vim.fn.json_encode({
-		model = config.options.model,
-		messages = {
-			{ role = "system", content = config.options.system_prompt },
-			{ role = "user", content = config.options.user_prompt .. "\n\n" .. diff },
-		},
-		temperature = config.options.temperature,
-	})
-
-	callback(" debug payload: " .. payload)
-	local response = curl.post("https://api.openai.com/v1/chat/completions", {
-		headers = {
-			["Authorization"] = "Bearer " .. api_key,
-			["Content-Type"] = "application/json",
-		},
-		body = vim.fn.json_encode(payload),
-	})
-
-	if response.status == 200 then
-		local ok, decoded = pcall(vim.fn.json_decode, response.body)
-		if ok and decoded and decoded.choices and decoded.choices[1] then
-			callback(decoded.choices[1].message.content)
-		else
-			callback("❌ Ongeldig antwoord van OpenAI API")
-		end
-	else
-		callback("❌ HTTP fout: " .. tostring(response.status))
-	end
 end
 
 function M.run()
