@@ -108,19 +108,27 @@ end
 
 function M.show_commit_ui(message)
 	local buf = vim.api.nvim_create_buf(false, true)
-	local lines = vim.split(message, "\n")
+	local lines = {}
+	table.insert(lines, "👃 Generated commit message:")
+
+	local mlines = vim.split(message, "\n")
 	table.insert(lines, "")
+	for _, line in ipairs(mlines) do
+		table.insert(lines, " " .. line)
+	end
 	table.insert(lines, " ───────────────────────────── ")
 	table.insert(lines, " [e] Edit  [c] Commit  [q] Quit ")
 	vim.api.nvim_buf_set_lines(buf, 0, -1, false, lines)
 
-	local width = 80
-	local height = 15
+	local width = math.floor(vim.o.columns * 0.6)
+	local height = math.max(20, #lines + 2)
+	local col = math.floor((vim.o.columns - width) / 2)
+
 	local win = vim.api.nvim_open_win(buf, true, {
 		relative = "editor",
 		width = width,
 		height = height,
-		col = (vim.o.columns - width) / 2,
+		col = col,
 		row = (vim.o.lines - height) / 2,
 		style = "minimal",
 		border = "rounded",
