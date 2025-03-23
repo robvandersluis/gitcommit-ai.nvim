@@ -1,0 +1,5 @@
+Verbeter foutafhandeling en update bufferinstellingen in de commit message generator
+
+- Vervang callback voor foutmeldingen door print-statements voor betere zichtbaarheid van fouten.
+- Voeg automatisch 'git add -A' toe voordat de commit wordt uitgevoerd.
+- Stel de buffernaam en -type in voor de commit message buffer, zodat deze correct wordt weergegeven in Vim.

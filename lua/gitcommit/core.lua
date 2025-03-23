@@ -37,10 +37,10 @@ function M.generate_commit_message(diff, callback)
 		if ok and decoded and decoded.choices and decoded.choices[1] then
 			callback(decoded.choices[1].message.content)
 		else
-			callback("❌ Ongeldig antwoord van OpenAI API")
+			print("❌ Ongeldig antwoord van OpenAI API")
 		end
 	else
-		callback("❌ HTTP fout: " .. tostring(response.status))
+		print("❌ HTTP fout: " .. tostring(response.status))
 	end
 end
 
@@ -95,6 +95,9 @@ function M.run()
 		-- Open commit message in new buffer
 		local buf = vim.api.nvim_create_buf(true, false) -- listed, not scratch
 		vim.api.nvim_buf_set_lines(buf, 0, -1, false, vim.fn.split(msg, "\n"))
+		vim.api.nvim_buf_set_name(buf, "AI Commit Message")
+		vim.bo[buf].filetype = "gitcommit"
+		vim.bo[buf].bufhidden = "wipe"
 
 		-- open buffer in new window
 		vim.api.nvim_set_current_buf(buf)
@@ -105,18 +108,19 @@ function M.run()
 			buffer = buf,
 			once = true,
 			callback = function()
+				-- Stage alles voor commit
+				vim.fn.system({ "git", "add", "-A" })
+
 				vim.fn.writefile(vim.api.nvim_buf_get_lines(buf, 0, -1, false), tmpfile)
 
 				-- Commit message
 				local out = vim.fn.system({ "git", "commit", "-F", tmpfile })
 				vim.notify(out, vim.log.levels.INFO)
+
+				-- Close buffer
+				vim.api.nvim_buf_delete(buf, { force = true })
 			end,
 		})
-
-		vim.api.nvim_buf_set_name(buf, "AI Commit Message")
-		vim.bo[buf].filetype = "gitcommit"
-		vim.bo[buf].buftype = ""
-		vim.bo[buf].bufhidden = "wipe"
 	end)
 end
 
