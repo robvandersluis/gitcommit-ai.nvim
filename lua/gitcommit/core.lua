@@ -12,7 +12,7 @@ function M.generate_commit_message(diff, callback)
 	local api_key = config.options.api_key or os.getenv("OPENAI_API_KEY")
 
 	if not api_key then
-		callback("❌ Geen OPENAI_API_KEY gevonden in environment en settings.api_key")
+		print("❌ OPENAI_API_KEY not found or empty.")
 		return
 	end
 	local payload = {
@@ -37,33 +37,31 @@ function M.generate_commit_message(diff, callback)
 		if ok and decoded and decoded.choices and decoded.choices[1] then
 			callback(decoded.choices[1].message.content)
 		else
-			print("❌ Ongeldig antwoord van OpenAI API")
+			print("❌ Unexpected OpenAI API	response:")
 		end
 	else
-		print("❌ HTTP fout: " .. tostring(response.status))
+		print("❌ HTTP error: " .. tostring(response.status))
 	end
 end
 
 function M.check_git_status()
-	-- if vim.fn.isdirectory(".git") == 0 then
-	-- 	print("🚫 Geen Git-repository gevonden.")
-	-- 	return false
-	-- end
+	if vim.fn.isdirectory(".git") == 0 then
+		return false, "🚫 No Git repository found."
+	end
 
 	local status = run_command("git status --porcelain -b")
 	if status:find("%[behind") then
-		print("⚠️  Je loopt achter op de remote branch! Doe eerst een git pull.")
-		return false
+		return false, "⚠️  You are behind the remote branch! Please run git pull first."
 	end
 
 	local untracked = run_command("git ls-files --others --exclude-standard")
 	if #untracked:gsub("%s+", "") > 0 then
-		print("⚠️  Ongetrackte bestanden gevonden:")
+		local message = "⚠️  Untracked files found:\n"
 		for line in untracked:gmatch("[^\r\n]+") do
-			print("  " .. line)
+			message = message .. "  " .. line .. "\n"
 		end
-		print("⚠️  Voeg ze toe met `git add`.")
-		return false
+		message = message .. "\n⚠️  Add them with `git add`."
+		return false, message
 	end
 
 	local lines = {}
@@ -72,22 +70,49 @@ function M.check_git_status()
 	end
 
 	if #lines == 1 then
-		print("✅ Geen wijzigingen om te committen.")
-		return false
+		return false, "✅ No changes to commit."
 	end
-
-	print("🔍 Gewijzigde bestanden:")
-	for i = 2, #lines do
-		print("  " .. lines[i])
-	end
-
+	-- print("🔍 Gewijzigde bestanden:")
+	-- for i = 2, #lines do
+	-- 	print("  " .. lines[i])
+	-- end
+	--
 	return true
 end
 
+local function show_floating_message(message)
+	local buf = vim.api.nvim_create_buf(false, true) -- [listed=false, scratch=true]
+	vim.api.nvim_buf_set_lines(buf, 0, -1, false, vim.split(message, "\n"))
+
+	local width = math.max(30, #message + 4)
+	local height = 5
+	local opts = {
+		relative = "editor",
+		width = width,
+		height = height,
+		row = (vim.o.lines - height) / 2,
+		col = (vim.o.columns - width) / 2,
+		style = "minimal",
+		border = "rounded",
+	}
+
+	local win = vim.api.nvim_open_win(buf, false, opts)
+
+	-- Sluit automatisch na 2 seconden
+	vim.defer_fn(function()
+		if vim.api.nvim_win_is_valid(win) then
+			vim.api.nvim_win_close(win, true)
+		end
+	end, 2000)
+end
+
 function M.run()
-	if not M.check_git_status() then
+	local ok, err = M.check_git_status()
+	if not ok then
+		show_floating_message(err)
 		return
 	end
+
 	local diff = run_command("git diff HEAD")
 	M.generate_commit_message(diff, function(msg)
 		--print("\n📦 Commit message:\n" .. msg)
