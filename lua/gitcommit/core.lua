@@ -239,8 +239,11 @@ end
 
 function M.prompt_push()
 	if git.can_push() then
+		local target = git.get_tracking_branch() or "remote"
+		local prompt_title = "Push to tracking branch [" .. target .. "]?"
+
 		vim.schedule(function()
-			vim.ui.select({ "Yes", "No" }, { prompt = "Push to Remote?" }, function(choice)
+			vim.ui.select({ "Yes", "No" }, { prompt = prompt_title }, function(choice)
 				if choice == "Yes" then
 					local push_out = vim.fn.system({ "git", "push" })
 					vim.notify(push_out, vim.log.levels.INFO)

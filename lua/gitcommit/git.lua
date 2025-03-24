@@ -33,6 +33,11 @@ function M.has_remote()
 	return #M.get_remotes() > 0
 end
 
+function M.get_tracking_branch()
+	local output = vim.fn.systemlist("git rev-parse --abbrev-ref --symbolic-full-name @{u}")
+	return not (output[1] or ""):match("fatal:") and output[1] or nil
+end
+
 -- Check if current branch has an upstream/tracking remote
 function M.has_tracking_branch()
 	local output = vim.fn.systemlist("git rev-parse --abbrev-ref --symbolic-full-name @{u}")
