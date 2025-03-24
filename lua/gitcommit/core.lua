@@ -1,4 +1,4 @@
--- lua/gitcommit /core.lua
+-- lua/gitcommit/core.lua
 local config = require("gitcommit.config")
 local curl = require("plenary.curl")
 
@@ -61,6 +61,17 @@ function M.check_git_status()
 			message = message .. "  " .. line .. "\n"
 		end
 		message = message .. "\n⚠️  Add them with `git add`."
+
+		--TODO: Add a prompt to add untracked files
+		-- vim.ui.select({ "Yes", "No" }, { prompt = "Add untracked files?" }, function(choice)
+		--	if choice == "Yes" then
+		--	vim.fn.system("git add .")
+		--	vim.notify("✅ Untracked files added.", vim.log.levels.INFO)
+		--	else
+		--	vim.notify("🚫 Untracked files not added.", vim.log.levels.WARN)
+		--	end
+		--	end)
+
 		return false, message
 	end
 
@@ -105,11 +116,6 @@ local function show_floating_message(message)
 		end
 	end, 3000)
 end
---[[
-📌 
-✅ Commit
-🚫 Cancel
-]]
 
 function M.show_commit_ui(message)
 	local buf = vim.api.nvim_create_buf(false, true)
