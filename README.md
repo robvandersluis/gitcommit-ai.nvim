@@ -27,7 +27,6 @@ Save time and write better commit messages with the help of AI. This plugin anal
     require("gitcommit").setup({
       
       -- Default Configuration:
-
       model = "gpt-4o-mini", 
       temperature = 0.7,
       system_prompt = [[
