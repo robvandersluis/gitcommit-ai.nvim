@@ -2,6 +2,7 @@
 local M = {}
 
 M.options = {
+	stage_all = true, -- Stage all changes before generating commit message
 	model = "gpt-4o-mini",
 	temperature = 0.7,
 	system_prompt = [[

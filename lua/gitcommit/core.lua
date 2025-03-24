@@ -54,28 +54,28 @@ function M.check_git_status()
 	if status:find("%[behind") then
 		return false, "⚠️  You are behind the remote branch! Please run git pull first."
 	end
+	if not config.options.stage_all then
+		local untracked = run_command("git ls-files --others --exclude-standard")
+		if #untracked:gsub("%s+", "") > 0 then
+			local message = "⚠️  Untracked files found:\n"
+			for line in untracked:gmatch("[^\r\n]+") do
+				message = message .. "  " .. line .. "\n"
+			end
+			message = message .. "\n⚠️  Add them with `git add`."
 
-	local untracked = run_command("git ls-files --others --exclude-standard")
-	if #untracked:gsub("%s+", "") > 0 then
-		local message = "⚠️  Untracked files found:\n"
-		for line in untracked:gmatch("[^\r\n]+") do
-			message = message .. "  " .. line .. "\n"
+			--TODO: Add a prompt to add untracked files
+			-- vim.ui.select({ "Yes", "No" }, { prompt = "Add untracked files?" }, function(choice)
+			--	if choice == "Yes" then
+			--	vim.fn.system("git add .")
+			--	vim.notify("✅ Untracked files added.", vim.log.levels.INFO)
+			--	else
+			--	vim.notify("🚫 Untracked files not added.", vim.log.levels.WARN)
+			--	end
+			--	end)
+
+			return false, message
 		end
-		message = message .. "\n⚠️  Add them with `git add`."
-
-		--TODO: Add a prompt to add untracked files
-		-- vim.ui.select({ "Yes", "No" }, { prompt = "Add untracked files?" }, function(choice)
-		--	if choice == "Yes" then
-		--	vim.fn.system("git add .")
-		--	vim.notify("✅ Untracked files added.", vim.log.levels.INFO)
-		--	else
-		--	vim.notify("🚫 Untracked files not added.", vim.log.levels.WARN)
-		--	end
-		--	end)
-
-		return false, message
 	end
-
 	local lines = {}
 	for line in status:gmatch("[^\r\n]+") do
 		table.insert(lines, line)
@@ -257,13 +257,21 @@ end
 
 function M.run()
 	local filepath = vim.api.nvim_buf_get_name(0)
-	if filepath == "" then
-		show_floating_message("❌ No active file.")
+	local git_root = git.find_git_root(filepath)
+	if not git_root then
+		show_floating_message("🚫 Not a Git repository.")
 		return
 	end
 
-	local filedir = vim.fn.fnamemodify(filepath, ":p:h")
-	vim.fn.chdir(filedir)
+	vim.fn.chdir(git_root)
+
+	-- if filepath == "" then
+	-- 	show_floating_message("❌ No active file.")
+	-- 	return
+	-- end
+	--
+	-- local filedir = vim.fn.fnamemodify(filepath, ":p:h")
+	-- vim.fn.chdir(filedir)
 
 	local ok, err = M.check_git_status()
 	if not ok then
