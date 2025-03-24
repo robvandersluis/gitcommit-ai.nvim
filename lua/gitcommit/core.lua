@@ -109,7 +109,6 @@ local function show_floating_message(message)
 
 	local win = vim.api.nvim_open_win(buf, false, opts)
 
-	-- Sluit automatisch na 2 seconden
 	vim.defer_fn(function()
 		if vim.api.nvim_win_is_valid(win) then
 			vim.api.nvim_win_close(win, true)
@@ -201,18 +200,6 @@ function M.commit_with_message(msg)
 	vim.notify(out, vim.log.levels.INFO)
 	M.prompt_push()
 end
-function M.run()
-	local ok, err = M.check_git_status()
-	if not ok then
-		show_floating_message(err)
-		return
-	end
-
-	local diff = run_command("git diff HEAD")
-	M.generate_commit_message(diff, function(msg)
-		M.show_commit_ui(msg)
-	end)
-end
 
 function M.open_commit_buffer(msg)
 	local tmpfile = vim.fn.tempname()
@@ -261,4 +248,27 @@ function M.prompt_push()
 		end)
 	end)
 end
+
+function M.run()
+	local filepath = vim.api.nvim_buf_get_name(0)
+	if filepath == "" then
+		show_floating_message("❌ No active file.")
+		return
+	end
+
+	local filedir = vim.fn.fnamemodify(filepath, ":p:h")
+	vim.fn.chdir(filedir)
+
+	local ok, err = M.check_git_status()
+	if not ok then
+		show_floating_message(err)
+		return
+	end
+
+	local diff = run_command("git diff HEAD")
+	M.generate_commit_message(diff, function(msg)
+		M.show_commit_ui(msg)
+	end)
+end
+
 return M
