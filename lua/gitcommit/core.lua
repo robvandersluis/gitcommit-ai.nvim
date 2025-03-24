@@ -272,6 +272,10 @@ function M.run()
 	end
 
 	local diff = run_command("git diff HEAD")
+	if diff == "" then
+		show_floating_message("❌ No changes to commit.")
+		return
+	end
 	M.generate_commit_message(diff, function(msg)
 		M.show_commit_ui(msg)
 	end)
