@@ -66,7 +66,7 @@ local function show_floating_message(message)
 	end, 3000)
 end
 
-function M.show_commit_ui(message)
+function M.show_commit_ui(message, is_staged)
 	local buf = vim.api.nvim_create_buf(false, true)
 	local lines = {}
 
@@ -128,6 +128,9 @@ function M.show_commit_ui(message)
 
 	-- Keymaps
 	vim.keymap.set("n", "q", function()
+		if is_staged then
+			vim.fn.system("git reset HEAD")
+		end
 		vim.api.nvim_win_close(win, true)
 	end, { buffer = buf, silent = true })
 
@@ -236,10 +239,9 @@ function M.check_git_repo()
 
 	if not config.options.stage_all then
 		if not git.has_staged_changes() then
-			return false, "🚫 Nothing staged. Stage something first."
+			--TODO: Add a staging UI
+			return false, " 🚫 Nothing staged. Stage something first."
 		end
-
-		--TODO: Add a staging UI
 	end
 	local lines = {}
 	for line in status:gmatch("[^\r\n]+") do
@@ -247,7 +249,7 @@ function M.check_git_repo()
 	end
 
 	if #lines == 1 then
-		return false, "✅ No changes to commit."
+		return false, " ✅ No changes to commit."
 	end
 	-- print("🔍 File Changes :")
 	-- for i = 2, #lines do
@@ -258,17 +260,17 @@ function M.check_git_repo()
 end
 
 function M.run()
+	-- check if commit is possible
 	local ok, err = M.check_git_repo()
 	if not ok then
 		show_floating_message(err)
 		return
 	end
 
-	--staging
+	local is_staged = false
 	if config.options.stage_all then
 		vim.fn.system("git add -A")
-	else
-		--TODO: Add a staging UI to select files
+		is_staged = true
 	end
 
 	local diff = vim.fn.system("git diff --cached")
@@ -278,10 +280,7 @@ function M.run()
 	end
 
 	M.generate_commit_message(diff, function(msg)
-		M.show_commit_ui(msg)
-		-- if cancel and staged then
-		--	vim.fn.system("git reset HEAD")
-		--
+		M.show_commit_ui(msg, is_staged)
 	end)
 end
 
