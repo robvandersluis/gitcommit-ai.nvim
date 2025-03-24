@@ -236,26 +236,14 @@ function M.check_git_repo()
 	if status:find("%[behind") then
 		return false, "⚠️  You are behind the remote branch! Please run git pull first."
 	end
-
-	if not config.options.stage_all then
-		if not git.has_staged_changes() then
-			--TODO: Add a staging UI
-			return false, " 🚫 Nothing staged. Stage something first."
-		end
-	end
 	local lines = {}
 	for line in status:gmatch("[^\r\n]+") do
 		table.insert(lines, line)
 	end
-
 	if #lines == 1 then
 		return false, " ✅ No changes to commit."
 	end
-	-- print("🔍 File Changes :")
-	-- for i = 2, #lines do
-	-- 	print("  " .. lines[i])
-	-- end
-	--
+
 	return true
 end
 
@@ -267,10 +255,16 @@ function M.run()
 		return
 	end
 
-	local is_staged = false
-	if config.options.stage_all then
+	local reset_on_cancel = false
+	if not config.options.stage_all then
+		if not git.has_staged_changes() then
+			--TODO: Add a staging UI
+			show_floating_message(" 🚫 Nothing staged. Stage something first.")
+			return
+		end
+	else
 		vim.fn.system("git add -A")
-		is_staged = true
+		reset_on_cancel = true
 	end
 
 	local diff = vim.fn.system("git diff --cached")
@@ -280,7 +274,7 @@ function M.run()
 	end
 
 	M.generate_commit_message(diff, function(msg)
-		M.show_commit_ui(msg, is_staged)
+		M.show_commit_ui(msg, reset_on_cancel)
 	end)
 end
 
