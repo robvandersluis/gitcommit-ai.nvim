@@ -44,6 +44,10 @@ function M.has_tracking_branch()
 	return not (output[1] or ""):match("fatal:")
 end
 
+function M.has_unstaged_changes()
+	local output = vim.fn.systemlist("git status --porcelain")
+	return #output > 0
+end
 -- Check if local branch is behind remote
 function M.is_behind()
 	local output = vim.fn.systemlist("git status -sb")[1]
