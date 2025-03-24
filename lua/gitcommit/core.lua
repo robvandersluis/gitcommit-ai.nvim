@@ -41,46 +41,6 @@ function M.generate_commit_message(diff, callback)
 	end
 end
 
-function M.check_git_status()
-	if git.can_fetch() then
-		vim.fn.system({ "git", "fetch" })
-	end
-
-	local status = vim.fn.system("git status --porcelain -b")
-	if status:find("%[behind") then
-		return false, "⚠️  You are behind the remote branch! Please run git pull first."
-	end
-
-	if not config.options.stage_all then
-		local untracked = vim.fn.system("git ls-files --others --exclude-standard")
-		if #untracked:gsub("%s+", "") > 0 then
-			local message = "⚠️  Untracked files found:\n"
-			for line in untracked:gmatch("[^\r\n]+") do
-				message = message .. "  " .. line .. "\n"
-			end
-			message = message .. "\n⚠️  Add them with `git add`."
-
-			--TODO: Add a staging UI
-
-			return false, message
-		end
-	end
-	local lines = {}
-	for line in status:gmatch("[^\r\n]+") do
-		table.insert(lines, line)
-	end
-
-	if #lines == 1 then
-		return false, "✅ No changes to commit."
-	end
-	-- print("🔍 File Changes :")
-	-- for i = 2, #lines do
-	-- 	print("  " .. lines[i])
-	-- end
-	--
-	return true
-end
-
 local function show_floating_message(message)
 	local buf = vim.api.nvim_create_buf(false, true) -- [listed=false, scratch=true]
 	vim.api.nvim_buf_set_lines(buf, 0, -1, false, vim.split(message, "\n"))
@@ -240,6 +200,46 @@ function M.prompt_push()
 			end)
 		end)
 	end
+end
+
+function M.check_git_status()
+	if git.can_fetch() then
+		vim.fn.system({ "git", "fetch" })
+	end
+
+	local status = vim.fn.system("git status --porcelain -b")
+	if status:find("%[behind") then
+		return false, "⚠️  You are behind the remote branch! Please run git pull first."
+	end
+
+	if not config.options.stage_all then
+		local untracked = vim.fn.system("git ls-files --others --exclude-standard")
+		if #untracked:gsub("%s+", "") > 0 then
+			local message = "⚠️  Untracked files found:\n"
+			for line in untracked:gmatch("[^\r\n]+") do
+				message = message .. "  " .. line .. "\n"
+			end
+			message = message .. "\n⚠️  Add them with `git add`."
+
+			--TODO: Add a staging UI
+
+			return false, message
+		end
+	end
+	local lines = {}
+	for line in status:gmatch("[^\r\n]+") do
+		table.insert(lines, line)
+	end
+
+	if #lines == 1 then
+		return false, "✅ No changes to commit."
+	end
+	-- print("🔍 File Changes :")
+	-- for i = 2, #lines do
+	-- 	print("  " .. lines[i])
+	-- end
+	--
+	return true
 end
 
 function M.run()
