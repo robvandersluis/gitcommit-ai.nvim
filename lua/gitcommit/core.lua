@@ -46,14 +46,11 @@ function M.generate_commit_message(diff, callback)
 end
 
 function M.check_git_status()
-	-- if vim.fn.isdirectory(".git") == 0 then
-	-- 	return false, "🚫 No Git repository found."
-	-- end
-
 	local status = run_command("git status --porcelain -b")
 	if status:find("%[behind") then
 		return false, "⚠️  You are behind the remote branch! Please run git pull first."
 	end
+
 	if not config.options.stage_all then
 		local untracked = run_command("git ls-files --others --exclude-standard")
 		if #untracked:gsub("%s+", "") > 0 then
@@ -63,15 +60,7 @@ function M.check_git_status()
 			end
 			message = message .. "\n⚠️  Add them with `git add`."
 
-			--TODO: Add a prompt to add untracked files
-			-- vim.ui.select({ "Yes", "No" }, { prompt = "Add untracked files?" }, function(choice)
-			--	if choice == "Yes" then
-			--	vim.fn.system("git add .")
-			--	vim.notify("✅ Untracked files added.", vim.log.levels.INFO)
-			--	else
-			--	vim.notify("🚫 Untracked files not added.", vim.log.levels.WARN)
-			--	end
-			--	end)
+			--TODO: Add a staging UI
 
 			return false, message
 		end
@@ -227,6 +216,7 @@ end
 
 function M.commit_from_buffer(buf, tmpfile)
 	vim.fn.system({ "git", "add", "-A" })
+
 	vim.fn.writefile(vim.api.nvim_buf_get_lines(buf, 0, -1, false), tmpfile)
 
 	local out = vim.fn.system({ "git", "commit", "-F", tmpfile })
@@ -256,22 +246,15 @@ function M.prompt_push()
 end
 
 function M.run()
+	--	local currentdir = vim.fn.getcwd()
+
 	local filepath = vim.api.nvim_buf_get_name(0)
 	local git_root = git.find_git_root(filepath)
 	if not git_root then
 		show_floating_message("🚫 Not a Git repository.")
 		return
 	end
-
 	vim.fn.chdir(git_root)
-
-	-- if filepath == "" then
-	-- 	show_floating_message("❌ No active file.")
-	-- 	return
-	-- end
-	--
-	-- local filedir = vim.fn.fnamemodify(filepath, ":p:h")
-	-- vim.fn.chdir(filedir)
 
 	local ok, err = M.check_git_status()
 	if not ok then
@@ -279,13 +262,24 @@ function M.run()
 		return
 	end
 
-	local diff = run_command("git diff HEAD")
-	if diff == "" then
+	--staging
+	if config.options.stage_all then
+		run_command("git add -A")
+	else
+		--TODO: Add a staging UI
+	end
+
+	local diff = run_command("git diff HEAD") --change to cached
+	if diff == "" then -- not sure, shouln't happen at this point
 		show_floating_message("❌ No changes to commit.")
 		return
 	end
+
 	M.generate_commit_message(diff, function(msg)
 		M.show_commit_ui(msg)
+		-- if cancel and staged then
+		--	run_command("git reset HEAD")
+		--
 	end)
 end
 
