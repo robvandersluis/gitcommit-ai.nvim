@@ -202,7 +202,29 @@ function M.prompt_push()
 	end
 end
 
-function M.check_git_status()
+function prompt_stage()
+	local files = vim.fn.systemlist("git diff --name-only")
+	if #files == 0 then
+		vim.notify("✅ Nothing to stage.", vim.log.levels.INFO)
+		return
+	end
+
+	vim.ui.select(files, { prompt = "Stage which file?" }, function(choice)
+		if choice then
+			local result = vim.fn.system({ "git", "add", choice })
+			vim.notify("📦 Staged: " .. choice, vim.log.levels.INFO)
+		end
+	end)
+end
+
+function M.check_git_repo()
+	local filepath = vim.api.nvim_buf_get_name(0)
+	local git_root = git.find_git_root(filepath)
+	if not git_root then
+		return false, "🚫 Not a Git repository."
+	end
+	vim.fn.chdir(git_root)
+
 	if git.can_fetch() then
 		vim.fn.system({ "git", "fetch" })
 	end
@@ -213,18 +235,11 @@ function M.check_git_status()
 	end
 
 	if not config.options.stage_all then
-		local untracked = vim.fn.system("git ls-files --others --exclude-standard")
-		if #untracked:gsub("%s+", "") > 0 then
-			local message = "⚠️  Untracked files found:\n"
-			for line in untracked:gmatch("[^\r\n]+") do
-				message = message .. "  " .. line .. "\n"
-			end
-			message = message .. "\n⚠️  Add them with `git add`."
-
-			--TODO: Add a staging UI
-
-			return false, message
+		if not git.has_staged_changes() then
+			return false, "🚫 Nothing staged. Stage something first."
 		end
+
+		--TODO: Add a staging UI
 	end
 	local lines = {}
 	for line in status:gmatch("[^\r\n]+") do
@@ -243,15 +258,7 @@ function M.check_git_status()
 end
 
 function M.run()
-	local filepath = vim.api.nvim_buf_get_name(0)
-	local git_root = git.find_git_root(filepath)
-	if not git_root then
-		show_floating_message("🚫 Not a Git repository.")
-		return
-	end
-	vim.fn.chdir(git_root)
-
-	local ok, err = M.check_git_status()
+	local ok, err = M.check_git_repo()
 	if not ok then
 		show_floating_message(err)
 		return
@@ -264,7 +271,7 @@ function M.run()
 		--TODO: Add a staging UI to select files
 	end
 
-	local diff = vim.fn.system("git diff HEAD") --change to cached
+	local diff = vim.fn.system("git diff --cached")
 	if diff == "" then
 		show_floating_message("❌ No changes to commit.")
 		return
