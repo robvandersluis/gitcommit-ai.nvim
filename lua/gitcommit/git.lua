@@ -55,6 +55,12 @@ function M.has_unstaged_changes()
 	return #output > 0
 end
 
+-- Returns true if there are any changes to commit (staged or not)
+function M.has_changes_to_commit()
+	local output = vim.fn.system("git status --porcelain")
+	return output ~= ""
+end
+
 -- Check if local branch is behind remote
 function M.is_behind()
 	local output = vim.fn.systemlist("git status -sb")[1]

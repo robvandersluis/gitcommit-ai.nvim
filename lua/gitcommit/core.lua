@@ -205,74 +205,72 @@ function M.prompt_push()
 	end
 end
 
-function prompt_stage()
-	local files = vim.fn.systemlist("git diff --name-only")
-	if #files == 0 then
-		vim.notify("✅ Nothing to stage.", vim.log.levels.INFO)
-		return
-	end
-
-	vim.ui.select(files, { prompt = "Stage which file?" }, function(choice)
-		if choice then
-			local result = vim.fn.system({ "git", "add", choice })
-			vim.notify("📦 Staged: " .. choice, vim.log.levels.INFO)
-		end
-	end)
-end
-
-function M.check_git_repo()
-	local filepath = vim.api.nvim_buf_get_name(0)
-	local git_root = git.find_git_root(filepath)
-	if not git_root then
-		return false, "🚫 Not a Git repository."
-	end
-	vim.fn.chdir(git_root)
-
+-- Fetches from remote if available and returns if we’re behind
+function M.check_remote_status()
 	if git.can_fetch() then
 		vim.fn.system({ "git", "fetch" })
-	end
 
-	local status = vim.fn.system("git status --porcelain -b")
-	if status:find("%[behind") then
-		return false, "⚠️  You are behind the remote branch! Please run git pull first."
-	end
-	local lines = {}
-	for line in status:gmatch("[^\r\n]+") do
-		table.insert(lines, line)
-	end
-	if #lines == 1 then
-		return false, " ✅ No changes to commit."
+		local status = vim.fn.system("git status --porcelain -b")
+		if status:find("%[behind") then
+			return false, "⚠️  You are behind the remote branch! Please run git pull first."
+		end
 	end
 
 	return true
 end
 
+-- Checks if current buffer is inside a Git repo and changes CWD
+function M.ensure_git_repo()
+	local filepath = vim.api.nvim_buf_get_name(0)
+	local git_root = git.find_git_root(filepath)
+	if not git_root then
+		return false, "🚫 Not a Git repository."
+	end
+
+	vim.fn.chdir(git_root)
+	return true
+end
+
 function M.run()
-	-- check if commit is possible
-	local ok, err = M.check_git_repo()
+	-- Check for Git repo
+	local ok, err = M.ensure_git_repo()
 	if not ok then
 		show_floating_message(err)
 		return
 	end
 
-	local reset_on_cancel = false
-	if not config.options.stage_all then
-		if not git.has_staged_changes() then
-			--TODO: Add a staging UI
-			show_floating_message(" 🚫 Nothing staged. Stage something first.")
-			return
-		end
-	else
-		vim.fn.system("git add -A")
-		reset_on_cancel = true
-	end
-
-	local diff = vim.fn.system("git diff --cached")
-	if diff == "" then
-		show_floating_message("❌ No changes to commit.")
+	-- Check remote tracking status
+	local ok_remote, err_remote = M.check_remote_status()
+	if not ok_remote then
+		show_floating_message(err_remote)
 		return
 	end
 
+	-- Check for changes
+	if not git.has_changes_to_commit() then
+		show_floating_message("✅ No changes to commit.")
+		return
+	end
+
+	-- Stage files
+	local reset_on_cancel = false
+	if config.options.stage_all then
+		vim.fn.system("git add -A")
+		reset_on_cancel = true
+	elseif not git.has_staged_changes() then
+		--TODO: Add a staging UI
+		show_floating_message(" 🚫 Nothing staged. Stage something first.")
+		return
+	end
+
+	-- Get diff of staged changes
+	local diff = vim.fn.system("git diff --cached")
+	if diff == "" then
+		show_floating_message("❌ No staged changes found.")
+		return
+	end
+
+	-- Generate commit message and open UI
 	M.generate_commit_message(diff, function(msg)
 		M.show_commit_ui(msg, reset_on_cancel)
 	end)
