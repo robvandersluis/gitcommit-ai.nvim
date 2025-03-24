@@ -1,6 +1,7 @@
 -- lua/gitcommit/core.lua
 local config = require("gitcommit.config")
 local curl = require("plenary.curl")
+local git = require("gitcommit.git")
 
 local M = {}
 
@@ -237,16 +238,18 @@ function M.commit_from_buffer(buf, tmpfile)
 end
 
 function M.prompt_push()
-	vim.schedule(function()
-		vim.ui.select({ "Yes", "No" }, { prompt = "Push to Remote?" }, function(choice)
-			if choice == "Yes" then
-				local push_out = vim.fn.system({ "git", "push" })
-				vim.notify(push_out, vim.log.levels.INFO)
-			else
-				vim.notify("🚀 Push skipped.", vim.log.levels.INFO)
-			end
+	if git.can_push() then
+		vim.schedule(function()
+			vim.ui.select({ "Yes", "No" }, { prompt = "Push to Remote?" }, function(choice)
+				if choice == "Yes" then
+					local push_out = vim.fn.system({ "git", "push" })
+					vim.notify(push_out, vim.log.levels.INFO)
+				else
+					vim.notify("🚀 Push skipped.", vim.log.levels.INFO)
+				end
+			end)
 		end)
-	end)
+	end
 end
 
 function M.run()
