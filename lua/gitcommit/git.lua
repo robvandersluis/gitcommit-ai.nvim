@@ -54,5 +54,7 @@ end
 function M.can_push()
 	return M.has_remote() and M.has_tracking_branch() and not M.is_behind()
 end
-
+function M.can_fetch()
+	return M.has_remote() and M.has_tracking_branch()
+end
 return M

@@ -5,10 +5,6 @@ local git = require("gitcommit.git")
 
 local M = {}
 
-local function run_command(cmd)
-	return vim.fn.system(cmd)
-end
-
 function M.generate_commit_message(diff, callback)
 	local api_key = config.options.api_key or os.getenv("OPENAI_API_KEY")
 
@@ -46,13 +42,17 @@ function M.generate_commit_message(diff, callback)
 end
 
 function M.check_git_status()
-	local status = run_command("git status --porcelain -b")
+	if git.can_fetch() then
+		vim.fn.system({ "git", "fetch" })
+	end
+
+	local status = vim.fn.system("git status --porcelain -b")
 	if status:find("%[behind") then
 		return false, "⚠️  You are behind the remote branch! Please run git pull first."
 	end
 
 	if not config.options.stage_all then
-		local untracked = run_command("git ls-files --others --exclude-standard")
+		local untracked = vim.fn.system("git ls-files --others --exclude-standard")
 		if #untracked:gsub("%s+", "") > 0 then
 			local message = "⚠️  Untracked files found:\n"
 			for line in untracked:gmatch("[^\r\n]+") do
@@ -184,7 +184,6 @@ end
 
 function M.commit_with_message(msg)
 	local tmpfile = vim.fn.tempname()
-	vim.fn.system({ "git", "add", "-A" })
 	vim.fn.writefile(vim.split(msg, "\n"), tmpfile)
 	local out = vim.fn.system({ "git", "commit", "-F", tmpfile })
 	vim.notify(out, vim.log.levels.INFO)
@@ -215,8 +214,6 @@ function M.open_commit_buffer(msg)
 end
 
 function M.commit_from_buffer(buf, tmpfile)
-	vim.fn.system({ "git", "add", "-A" })
-
 	vim.fn.writefile(vim.api.nvim_buf_get_lines(buf, 0, -1, false), tmpfile)
 
 	local out = vim.fn.system({ "git", "commit", "-F", tmpfile })
@@ -246,8 +243,6 @@ function M.prompt_push()
 end
 
 function M.run()
-	--	local currentdir = vim.fn.getcwd()
-
 	local filepath = vim.api.nvim_buf_get_name(0)
 	local git_root = git.find_git_root(filepath)
 	if not git_root then
@@ -264,13 +259,13 @@ function M.run()
 
 	--staging
 	if config.options.stage_all then
-		run_command("git add -A")
+		vim.fn.system("git add -A")
 	else
-		--TODO: Add a staging UI
+		--TODO: Add a staging UI to select files
 	end
 
-	local diff = run_command("git diff HEAD") --change to cached
-	if diff == "" then -- not sure, shouln't happen at this point
+	local diff = vim.fn.system("git diff HEAD") --change to cached
+	if diff == "" then
 		show_floating_message("❌ No changes to commit.")
 		return
 	end
@@ -278,7 +273,7 @@ function M.run()
 	M.generate_commit_message(diff, function(msg)
 		M.show_commit_ui(msg)
 		-- if cancel and staged then
-		--	run_command("git reset HEAD")
+		--	vim.fn.system("git reset HEAD")
 		--
 	end)
 end
