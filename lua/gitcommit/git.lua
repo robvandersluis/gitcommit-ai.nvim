@@ -55,6 +55,10 @@ function M.has_unstaged_changes()
 	return #output > 0
 end
 
+function M.branch_name()
+	return vim.fn.system("git rev-parse --abbrev-ref HEAD"):gsub("\n", "")
+end
+
 -- Returns true if there are any changes to commit (staged or not)
 function M.has_changes_to_commit()
 	local output = vim.fn.system("git status --porcelain")

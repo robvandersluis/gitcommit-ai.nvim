@@ -108,10 +108,9 @@ The built-in prompt will guide the AI to:
 
 ---
 
-## 📷 Demo (Coming Soon)
+## 📷 screenshot
 
-![demo-gif-placeholder](https://via.placeholder.com/600x300?text=Demo+GIF+Coming+Soon)
-
+![MyPlugin Screenshot](media/screenshot.png)
 ---
 
 ## ✅ Todo / Ideas

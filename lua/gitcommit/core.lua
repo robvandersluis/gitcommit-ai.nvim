@@ -41,113 +41,6 @@ function M.generate_commit_message(diff, callback)
 	end
 end
 
-local function show_floating_message(message)
-	local buf = vim.api.nvim_create_buf(false, true) -- [listed=false, scratch=true]
-	vim.api.nvim_buf_set_lines(buf, 0, -1, false, vim.split(message, "\n"))
-
-	local width = math.max(30, #message + 4)
-	local height = 5
-	local opts = {
-		relative = "editor",
-		width = width,
-		height = height,
-		row = (vim.o.lines - height) / 2,
-		col = (vim.o.columns - width) / 2,
-		style = "minimal",
-		border = "rounded",
-	}
-
-	local win = vim.api.nvim_open_win(buf, false, opts)
-
-	vim.defer_fn(function()
-		if vim.api.nvim_win_is_valid(win) then
-			vim.api.nvim_win_close(win, true)
-		end
-	end, 3000)
-end
-
-function M.show_commit_ui(message, is_staged)
-	local buf = vim.api.nvim_create_buf(false, true)
-	vim.api.nvim_buf_set_option(buf, "buftype", "nofile")
-
-	local lines = {}
-
-	table.insert(lines, " 📌 Generated commit message:")
-	table.insert(lines, "")
-
-	local mlines = vim.split(message, "\n")
-	for _, line in ipairs(mlines) do
-		table.insert(lines, "  " .. line)
-	end
-
-	table.insert(lines, "")
-	table.insert(
-		lines,
-		"─────────────────────────────────────────────"
-	)
-	table.insert(lines, " [e] Edit    [c] Commit    [q] Quit ")
-
-	vim.api.nvim_buf_set_lines(buf, 0, -1, false, lines)
-	-- Window layout
-	local width = math.floor(vim.o.columns * 0.6)
-	local height = #lines + 2
-	local col = math.floor((vim.o.columns - width) / 2)
-	local row = math.floor((vim.o.lines - height) / 2)
-	local win = vim.api.nvim_open_win(buf, true, {
-		relative = "cursor",
-		width = width,
-		height = height,
-		col = col,
-		row = row,
-		style = "minimal",
-		border = "rounded",
-	})
-
-	-- Styling via extmarks
-	local ns = vim.api.nvim_create_namespace("commit-ui")
-	vim.api.nvim_buf_add_highlight(buf, ns, "Title", 0, 0, -1)
-	vim.api.nvim_buf_add_highlight(buf, ns, "Comment", #lines - 2, 0, -1)
-
-	-- Highlight key shortcuts
-	local keyline = #lines - 1
-	local keymap = {
-		{ "[e]", "Keyword" },
-		{ "Edit   ", "Normal" },
-		{ "[c]", "Keyword" },
-		{ "Commit   ", "Normal" },
-		{ "[q]", "Keyword" },
-		{ "Quit", "Normal" },
-	}
-
-	local col_pos = 1
-	for _, pair in ipairs(keymap) do
-		local text, hl = unpack(pair)
-		local start_col = col_pos
-		local end_col = start_col + #text
-		vim.api.nvim_buf_add_highlight(buf, ns, hl, keyline, start_col - 1, end_col)
-		col_pos = end_col + 1
-	end
-	vim.api.nvim_buf_set_option(buf, "modifiable", false)
-
-	-- Keymaps
-	vim.keymap.set("n", "q", function()
-		if is_staged then
-			vim.fn.system("git reset HEAD")
-		end
-		vim.api.nvim_win_close(win, true)
-	end, { buffer = buf, silent = true })
-
-	vim.keymap.set("n", "c", function()
-		vim.api.nvim_win_close(win, true)
-		M.commit_with_message(message)
-	end, { buffer = buf, silent = true })
-
-	vim.keymap.set("n", "e", function()
-		vim.api.nvim_win_close(win, true)
-		M.open_commit_buffer(message)
-	end, { buffer = buf, silent = true })
-end
-
 function M.commit_with_message(msg)
 	local tmpfile = vim.fn.tempname()
 	vim.fn.writefile(vim.split(msg, "\n"), tmpfile)
@@ -208,6 +101,122 @@ function M.prompt_push()
 	end
 end
 
+-- Shows a floating window with the commit message and key bindings
+function M.show_commit_ui(message, is_staged)
+	local buf = vim.api.nvim_create_buf(false, true)
+	vim.api.nvim_buf_set_option(buf, "buftype", "nofile")
+	local cwd = vim.fn.getcwd()
+	local dir_name = vim.fn.fnamemodify(cwd, ":t")
+	local branch = git.branch_name()
+
+	local lines = {}
+	table.insert(lines, " 📁 Repo: " .. dir_name .. "   🌿 Branch: " .. branch)
+	table.insert(lines, "")
+	table.insert(lines, " Generated commit message: ")
+	table.insert(lines, "")
+
+	local max_lines = 10
+	local mlines = vim.split(message, "\n")
+	for i, line in ipairs(mlines) do
+		if i > max_lines then
+			table.insert(lines, "  ... (truncated)")
+			break
+		end
+		table.insert(lines, "  " .. line)
+	end
+
+	table.insert(lines, "")
+	table.insert(
+		lines,
+		"─────────────────────────────────────────────"
+	)
+	table.insert(lines, " [e] Edit    [c] Commit    [q] Quit ")
+
+	vim.api.nvim_buf_set_lines(buf, 0, -1, false, lines)
+	-- Window layout
+	local width = math.floor(vim.o.columns * 0.7)
+	local height = math.min(40, #lines + 2)
+	local col = math.floor((vim.o.columns - width) / 2)
+	local row = math.floor((vim.o.lines - height) / 2)
+	local win = vim.api.nvim_open_win(buf, true, {
+		relative = "editor",
+		width = width,
+		height = height,
+		col = col,
+		row = row,
+		style = "minimal",
+		border = "rounded",
+	})
+
+	-- Styling via extmarks
+	local ns = vim.api.nvim_create_namespace("commit-ui")
+	--	vim.api.nvim_buf_add_highlight(buf, ns, "Identifier", 0, 0, -1)
+	vim.api.nvim_buf_add_highlight(buf, ns, "Identifier", 0, 0, #(" 📁 Repo: " .. dir_name))
+	vim.api.nvim_buf_add_highlight(buf, ns, "Type", 0, #(" 📁 Repo: " .. dir_name .. "   🌿 "), -1)
+	vim.api.nvim_buf_add_highlight(buf, ns, "Title", 2, 0, -1)
+	vim.api.nvim_buf_add_highlight(buf, ns, "Comment", #lines - 2, 0, -1)
+
+	-- Highlight key shortcuts
+	local keyline = #lines - 1
+	local keymap = {
+		{ "[e]", "Keyword" },
+		{ "Edit   ", "Normal" },
+		{ "[c]", "Keyword" },
+		{ "Commit   ", "Normal" },
+		{ "[q]", "Keyword" },
+		{ "Quit", "Normal" },
+	}
+
+	local col_pos = 1
+	for _, pair in ipairs(keymap) do
+		local text, hl = unpack(pair)
+		local start_col = col_pos
+		local end_col = start_col + #text
+		vim.api.nvim_buf_add_highlight(buf, ns, hl, keyline, start_col - 1, end_col)
+		col_pos = end_col + 1
+	end
+
+	local highlights = {
+		Refactor = "Keyword",
+		Feature = "String",
+		Bugfix = "Error",
+	}
+	-- Highlight commit types (e.g., "Refactor", "Feature", "Bugfix")
+	for i, line in ipairs(lines) do
+		for word, hl in pairs(highlights) do
+			local s, e = line:find(word)
+			if s and e then
+				vim.api.nvim_buf_add_highlight(buf, ns, hl, i - 1, s - 1, e)
+			end
+		end
+	end
+	vim.api.nvim_buf_set_option(buf, "modifiable", false)
+	-- Keymaps
+	vim.keymap.set("n", "q", function()
+		if is_staged then
+			vim.fn.system("git reset HEAD")
+		end
+		vim.api.nvim_win_close(win, true)
+	end, { buffer = buf, silent = true })
+
+	vim.keymap.set("n", "c", function()
+		vim.api.nvim_win_close(win, true)
+		M.commit_with_message(message)
+	end, { buffer = buf, silent = true })
+
+	vim.keymap.set("n", "e", function()
+		vim.api.nvim_win_close(win, true)
+		M.open_commit_buffer(message)
+	end, { buffer = buf, silent = true })
+
+	vim.api.nvim_create_autocmd({ "CursorMoved", "CursorMovedI" }, {
+		buffer = buf,
+		callback = function()
+			vim.api.nvim_win_set_cursor(win, { #lines - 2, 0 })
+		end,
+	})
+end
+
 -- Fetches from remote if available and returns if we’re behind
 function M.check_remote_status()
 	if git.can_fetch() then
@@ -232,6 +241,31 @@ function M.ensure_git_repo()
 
 	vim.fn.chdir(git_root)
 	return true
+end
+
+local function show_floating_message(message)
+	local buf = vim.api.nvim_create_buf(false, true) -- [listed=false, scratch=true]
+	vim.api.nvim_buf_set_lines(buf, 0, -1, false, vim.split(message, "\n"))
+
+	local width = math.max(30, #message + 4)
+	local height = 5
+	local opts = {
+		relative = "editor",
+		width = width,
+		height = height,
+		row = (vim.o.lines - height) / 2,
+		col = (vim.o.columns - width) / 2,
+		style = "minimal",
+		border = "rounded",
+	}
+
+	local win = vim.api.nvim_open_win(buf, false, opts)
+
+	vim.defer_fn(function()
+		if vim.api.nvim_win_is_valid(win) then
+			vim.api.nvim_win_close(win, true)
+		end
+	end, 3000)
 end
 
 function M.run()
