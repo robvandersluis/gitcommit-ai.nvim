@@ -69,8 +69,7 @@ end
 function M.show_commit_ui(message, is_staged)
 	local buf = vim.api.nvim_create_buf(false, true)
 	vim.api.nvim_buf_set_option(buf, "buftype", "nofile")
-	vim.api.nvim_buf_set_option(buf, "filetype", "alist")
-	vim.api.nvim_buf_set_option(buf, "modeline", false)
+
 	local lines = {}
 
 	table.insert(lines, " 📌 Generated commit message:")
@@ -128,6 +127,7 @@ function M.show_commit_ui(message, is_staged)
 		vim.api.nvim_buf_add_highlight(buf, ns, hl, keyline, start_col - 1, end_col)
 		col_pos = end_col + 1
 	end
+	vim.api.nvim_buf_set_option(buf, "modifiable", false)
 
 	-- Keymaps
 	vim.keymap.set("n", "q", function()
