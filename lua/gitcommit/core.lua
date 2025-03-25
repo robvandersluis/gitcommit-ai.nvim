@@ -41,46 +41,71 @@ function M.generate_commit_message(diff, callback)
 	end
 end
 
-function M.commit_with_message(msg)
+function M.commit_from_lines(lines, reset_on_cancel)
+	local trimmed = vim.tbl_filter(function(line)
+		return line:match("%S") -- check for any non-whitespace
+	end, lines)
+
+	if #trimmed == 0 then
+		vim.notify("❌ Commit aborted: message is empty", vim.log.levels.WARN)
+		if reset_on_cancel then
+			vim.fn.system("git reset HEAD")
+		end
+		return
+	end
+
 	local tmpfile = vim.fn.tempname()
-	vim.fn.writefile(vim.split(msg, "\n"), tmpfile)
+	vim.fn.writefile(lines, tmpfile)
 	local out = vim.fn.system({ "git", "commit", "-F", tmpfile })
-	vim.notify(out, vim.log.levels.INFO)
-	M.prompt_push()
+
+	os.remove(tmpfile)
+	if vim.v.shell_error ~= 0 then
+		vim.notify("⚠️ Git commit failed:\n" .. out, vim.log.levels.ERROR)
+		if reset_on_cancel then
+			vim.fn.system("git reset HEAD")
+		end
+	else
+		vim.notify(out, vim.log.levels.INFO)
+		M.prompt_push()
+	end
 end
 
-function M.open_commit_buffer(msg)
-	local tmpfile = vim.fn.tempname()
+function M.commit_with_message(msg, reset_on_cancel)
+	M.commit_from_lines(vim.split(msg, "\n"), reset_on_cancel)
+end
+
+function M.commit_from_buffer(bufnr, reset_on_cancel)
+	local lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
+	vim.api.nvim_buf_delete(bufnr, { force = true })
+	M.commit_from_lines(lines, reset_on_cancel)
+end
+
+function M.open_commit_buffer(msg, reset_on_cancel)
 	local buf = vim.api.nvim_create_buf(true, false)
 	vim.api.nvim_buf_set_lines(buf, 0, -1, false, vim.fn.split(msg, "\n"))
+	local tmpfile = vim.fn.tempname()
 	vim.api.nvim_buf_set_name(buf, tmpfile)
 	vim.bo[buf].filetype = "gitcommit"
 	vim.bo[buf].bufhidden = "wipe"
 	vim.api.nvim_set_current_buf(buf)
 
 	vim.keymap.set("n", "q", function()
+		os.remove(tmpfile)
 		vim.notify("❌ Commit canceled.", vim.log.levels.WARN)
 		vim.api.nvim_buf_delete(buf, { force = true })
+		if reset_on_cancel then
+			vim.fn.system("git reset HEAD")
+		end
 	end, { buffer = buf, silent = true })
 
 	vim.api.nvim_create_autocmd("BufWritePost", {
 		buffer = buf,
 		once = true,
 		callback = function()
-			M.commit_from_buffer(buf, tmpfile)
+			M.commit_from_buffer(buf, reset_on_cancel)
+			os.remove(tmpfile)
 		end,
 	})
-end
-
-function M.commit_from_buffer(buf, tmpfile)
-	vim.fn.writefile(vim.api.nvim_buf_get_lines(buf, 0, -1, false), tmpfile)
-
-	local out = vim.fn.system({ "git", "commit", "-F", tmpfile })
-	vim.notify(out, vim.log.levels.INFO)
-
-	vim.api.nvim_buf_delete(buf, { force = true })
-
-	M.prompt_push()
 end
 
 function M.prompt_push()
@@ -150,7 +175,6 @@ function M.show_commit_ui(message, is_staged)
 
 	-- Styling via extmarks
 	local ns = vim.api.nvim_create_namespace("commit-ui")
-	--	vim.api.nvim_buf_add_highlight(buf, ns, "Identifier", 0, 0, -1)
 	vim.api.nvim_buf_add_highlight(buf, ns, "Identifier", 0, 0, #(" 📁 Repo: " .. dir_name))
 	vim.api.nvim_buf_add_highlight(buf, ns, "Type", 0, #(" 📁 Repo: " .. dir_name .. "   🌿 "), -1)
 	vim.api.nvim_buf_add_highlight(buf, ns, "Title", 2, 0, -1)
@@ -201,12 +225,12 @@ function M.show_commit_ui(message, is_staged)
 
 	vim.keymap.set("n", "c", function()
 		vim.api.nvim_win_close(win, true)
-		M.commit_with_message(message)
+		M.commit_with_message(message, is_staged)
 	end, { buffer = buf, silent = true })
 
 	vim.keymap.set("n", "e", function()
 		vim.api.nvim_win_close(win, true)
-		M.open_commit_buffer(message)
+		M.open_commit_buffer(message, is_staged)
 	end, { buffer = buf, silent = true })
 
 	vim.api.nvim_create_autocmd({ "CursorMoved", "CursorMovedI" }, {
