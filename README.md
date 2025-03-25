@@ -119,8 +119,8 @@ The built-in prompt will guide the AI to:
 - [x] Cancel with `q`
 - [x] Ask to push
 - [ ] Add retry (`:GenerateCommitMessage!`)
-- [ ] Add option for `git diff --cached`
-- [ ] Highlight AI output (e.g., markdown/comments)
+- [x] Add option for `git diff --cached`
+- [x] Highlight AI output (e.g., markdown/comments)
 - [ ] `.env` file support (optional)
 
 ---
