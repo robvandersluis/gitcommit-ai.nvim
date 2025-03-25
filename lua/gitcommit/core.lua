@@ -68,6 +68,9 @@ end
 
 function M.show_commit_ui(message, is_staged)
 	local buf = vim.api.nvim_create_buf(false, true)
+	vim.api.nvim_buf_set_option(buf, "buftype", "nofile")
+	vim.api.nvim_buf_set_option(buf, "filetype", "alist")
+	vim.api.nvim_buf_set_option(buf, "modeline", false)
 	local lines = {}
 
 	table.insert(lines, " 📌 Generated commit message:")
