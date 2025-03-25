@@ -106,6 +106,14 @@ function M.open_commit_buffer(msg, reset_on_cancel)
 			os.remove(tmpfile)
 		end,
 	})
+	vim.api.nvim_create_autocmd("BufUnload", {
+		buffer = buf,
+		callback = function()
+			if vim.fn.filereadable(tmpfile) == 1 then
+				pcall(os.remove, tmpfile)
+			end
+		end,
+	})
 end
 
 function M.prompt_push()
