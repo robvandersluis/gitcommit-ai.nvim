@@ -66,7 +66,9 @@ function M.commit_from_lines(lines, reset_on_cancel)
 		end
 	else
 		vim.notify(out, vim.log.levels.INFO)
-		M.prompt_push()
+		if config.options.prompt_after_commit then
+			M.prompt_push()
+		end
 	end
 end
 
@@ -90,7 +92,6 @@ function M.open_commit_buffer(msg, reset_on_cancel)
 	vim.api.nvim_set_current_buf(buf)
 
 	vim.keymap.set("n", "q", function()
-		os.remove(tmpfile)
 		vim.notify("❌ Commit canceled.", vim.log.levels.WARN)
 		vim.api.nvim_buf_delete(buf, { force = true })
 		if reset_on_cancel then
@@ -103,7 +104,6 @@ function M.open_commit_buffer(msg, reset_on_cancel)
 		once = true,
 		callback = function()
 			M.commit_from_buffer(buf, reset_on_cancel)
-			os.remove(tmpfile)
 		end,
 	})
 	vim.api.nvim_create_autocmd("BufUnload", {
@@ -309,6 +309,14 @@ function M.run()
 	end
 
 	-- Check remote tracking status
+	if config.options.auto_fetch then
+		local ok_remote, err_remote = M.check_remote_status()
+		if not ok_remote then
+			show_floating_message(err_remote)
+			return
+		end
+	end
+
 	local ok_remote, err_remote = M.check_remote_status()
 	if not ok_remote then
 		show_floating_message(err_remote)

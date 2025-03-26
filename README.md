@@ -68,6 +68,7 @@ $env:OPENAI_API_KEY = "sk-..."
 5. A commit message is generated using the staged diff (git diff --cached)
 6. A preview buffer opens with the generated commit message
 7. You can:
+  - Commit (c) when satisfied
   - Edit (e) and save (:w) to confirm and commit
   - Quit (q) to cancel
 8. If the commit is cancelled and stage_all = true, a git reset is performed to unstage changes 
@@ -91,8 +92,10 @@ Return only the commit message, without any explanation.
 ]],
   user_prompt = "Generate a clear commit message based on this git diff:",
   api_key = os.getenv("OPENAI_API_KEY"),
-  stage_all = true, -- Stage all changes (git add -A) before commit
-  --    stage_all = false: You must stage files before running the plugin
+  auto_fetch = true, -- Fetch before pushing (if tracking branch exists)
+  prompt_after_commit = true, -- Prompt to push after committing
+  stage_all = true,  -- Stage all changes (git add -A) before commit
+--stage_all = false  -- You must stage files before running the plugin
 })
 ```
 
@@ -117,15 +120,15 @@ The built-in prompt will guide the AI to:
 ## ✅ Todo / Ideas
 
 - [x] Working core logic
-- [x] Cancel with `q`
-- [x] Ask to push
 - [ ] Add retry (`:GenerateCommitMessage!`)
 - [x] Add option for `git diff --cached`
 - [x] Highlight AI output (e.g., markdown/comments)
 - [ ] `.env` file support (dotenv)
+- [ ] Add support for other AI models
+- [ ] Add support for local llm-server (ollama,LM-studio,..)
 
 ---
-
-Made with  and way too much coffee ☕ by [@robvandersluis](https://github.com/robvandersluis)
-
 A Neovim plugin that generates AI-powered Git commit messages using OpenAI.
+
+☕ by [@robvandersluis](https://github.com/robvandersluis)
+
