@@ -317,12 +317,6 @@ function M.run()
 		end
 	end
 
-	local ok_remote, err_remote = M.check_remote_status()
-	if not ok_remote then
-		show_floating_message(err_remote)
-		return
-	end
-
 	-- Check for changes
 	if not git.has_changes_to_commit() then
 		show_floating_message("✅ No changes to commit.")
