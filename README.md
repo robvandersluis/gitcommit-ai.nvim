@@ -37,20 +37,20 @@ Save time and write better commit messages with the help of AI. This plugin anal
 
 ## 🔐 Setting your OpenAI API Key
 
-This plugin reads the API key from the `OPENAI_API_KEY` environment variable.
-
+This plugin reads your API key from the OPENAI_API_KEY environment variable by default.
+You can also pass it manually via the api_key option in the setup() call (not recommended for security reasons).
 ### Linux / macOS (Zsh or Bash)
 ```bash
-echo 'export OPENAI_API_KEY="sk-..."' >> ~/.zshrc
-source ~/.zshrc
+echo 'export OPENAI_API_KEY="sk-..."' >> ~/.zshrc  # or ~/.bashrc
+source ~/.zshrc  # or source ~/.bashrc
 ```
 
 ### Windows (PowerShell)
 ```powershell
-notepad $PROFILE
+nvim $PROFILE
 # Add this line:
 $env:OPENAI_API_KEY = "sk-..."
-. $PROFILE
+. $PROFILE  # Reload the profile
 ```
 
 ---
@@ -61,13 +61,18 @@ $env:OPENAI_API_KEY = "sk-..."
 - Or use the default keymap: `<leader>gc`
 
 ### Workflow:
-1. Plugin checks if you're in a valid Git repo with unstaged changes
-2. It generates a commit message based on `git diff HEAD`
-3. Opens a buffer with the message (you can still edit)
-4. Save (`:w`) to commit
-5. Press `q` to cancel
-6. After commit, you'll be asked if you want to push
-
+1. Checks if the current buffer belongs to a valid Git repository
+2. It checks for changes using git status --porcelain
+3. If stage_all = true, it runs git add -A
+4. If stage_all = false, it checks for staged changes and aborts if there are none
+5. A commit message is generated using the staged diff (git diff --cached)
+6. A preview buffer opens with the generated commit message
+7. You can:
+  - Edit (e) and save (:w) to confirm and commit
+  - Quit (q) to cancel
+8. If the commit is cancelled and stage_all = true, a git reset is performed to unstage changes 
+9. Optionally prompts to push (only if a tracking branch exists)
+9. Done! 🎉
 ---
 
 ## ⚙️ Configuration options
@@ -119,7 +124,7 @@ The built-in prompt will guide the AI to:
 - [ ] Add retry (`:GenerateCommitMessage!`)
 - [x] Add option for `git diff --cached`
 - [x] Highlight AI output (e.g., markdown/comments)
-- [ ] `.env` file support (optional)
+- [ ] `.env` file support (dotenv)
 
 ---
 
