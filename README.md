@@ -93,8 +93,6 @@ Return only the commit message, without any explanation.
   api_key = os.getenv("OPENAI_API_KEY"),
   stage_all = true, -- Stage all changes (git add -A) before commit
   --    stage_all = false: You must stage files before running the plugin
-  model = "gpt-4o",
-  api_key = "...", -- optional (will default to env var)
 })
 ```
 
