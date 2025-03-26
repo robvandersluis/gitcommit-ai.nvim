@@ -25,22 +25,7 @@ Save time and write better commit messages with the help of AI. This plugin anal
   dependencies = { "nvim-lua/plenary.nvim" },
   config = function()
     require("gitcommit").setup({
-      
-      -- Default Configuration:
-      model = "gpt-4o-mini", 
-      temperature = 0.7,
-      system_prompt = [[
-        You are an assistant that only generates git commit messages.
-        Use one of the following prefixes:
-        - Feature: for new functionality
-          - Bugfix: for resolved bugs
-          - Refactor: for code changes without functional impact
-        Return only the commit message, without any explanation.
-      ]],
-      user_prompt = "Generate a clear commit message based on this git diff:",
-      api_key = os.getenv("OPENAI_API_KEY"),
-      stage_all = true, -- Stage all changes (git add -A) before commit
---    stage_all = false: You must stage files before running the plugin
+      stage_all = true, -- Automatically stage changes (git add -A)
     })
 
     vim.keymap.set("n", "<leader>gc", "<cmd>GenerateCommitMessage<CR>", { desc = "AI Commit" })
@@ -89,10 +74,21 @@ $env:OPENAI_API_KEY = "sk-..."
 
 ```lua
 require("gitcommit").setup({
-  model = "gpt-4o",
+  model = "gpt-4o-mini", 
   temperature = 0.7,
-  system_prompt = "...",
-  user_prompt = "...",
+  system_prompt = [[
+You are an assistant that only generates git commit messages.
+Use one of the following prefixes:
+- Feature: for new functionality
+- Bugfix: for resolved bugs
+- Refactor: for code changes without functional impact
+Return only the commit message, without any explanation.
+]],
+  user_prompt = "Generate a clear commit message based on this git diff:",
+  api_key = os.getenv("OPENAI_API_KEY"),
+  stage_all = true, -- Stage all changes (git add -A) before commit
+  --    stage_all = false: You must stage files before running the plugin
+  model = "gpt-4o",
   api_key = "...", -- optional (will default to env var)
 })
 ```
@@ -127,19 +123,6 @@ The built-in prompt will guide the AI to:
 
 ---
 
-## 🧪 Local Development
-```lua
-{
-  dir = "~/plugins/gitcommit-ai.nvim",
-  dependencies = { "nvim-lua/plenary.nvim" },
-  config = function()
-    require("gitcommit").setup()
-  end,
-}
-```
-
----
-
-Made with ❤️ and way too much coffee ☕ by [@robvandersluis](https://github.com/robvandersluis)
+Made with  and way too much coffee ☕ by [@robvandersluis](https://github.com/robvandersluis)
 
 A Neovim plugin that generates AI-powered Git commit messages using OpenAI.
