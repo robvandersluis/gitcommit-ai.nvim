@@ -2,16 +2,24 @@
 local config = require("gitcommit.config")
 local curl = require("plenary.curl")
 local git = require("gitcommit.git")
+local Job = require("plenary.job")
 
 local M = {}
+
+local function notify_async(msg, level)
+	vim.schedule(function()
+		vim.notify(msg, level or vim.log.levels.INFO)
+	end)
+end
 
 function M.generate_commit_message(diff, callback)
 	local api_key = config.options.api_key or os.getenv("OPENAI_API_KEY")
 
 	if not api_key then
-		print("❌ OPENAI_API_KEY not found or empty.")
+		vim.notify("❌ OPENAI_API_KEY not found or empty.", vim.log.levels.ERROR)
 		return
 	end
+
 	local payload = {
 		model = config.options.model,
 		messages = {
@@ -21,24 +29,60 @@ function M.generate_commit_message(diff, callback)
 		temperature = config.options.temperature,
 	}
 
-	local response = curl.post("https://api.openai.com/v1/chat/completions", {
-		headers = {
-			["Authorization"] = "Bearer " .. api_key,
-			["Content-Type"] = "application/json",
+	Job:new({
+		command = "curl",
+		args = {
+			"-sS",
+			"-X",
+			"POST",
+			"-H",
+			"Content-Type: application/json",
+			"-H",
+			"Authorization: Bearer " .. api_key,
+			"--data",
+			vim.fn.json_encode(payload),
+			"https://api.openai.com/v1/chat/completions",
 		},
-		body = vim.fn.json_encode(payload),
-	})
+		on_exit = function(j, return_val)
+			local stdout = table.concat(j:result(), "\n")
+			local stderr = table.concat(j:stderr_result(), "\n")
 
-	if response.status == 200 then
-		local ok, decoded = pcall(vim.fn.json_decode, response.body)
-		if ok and decoded and decoded.choices and decoded.choices[1] then
-			callback(decoded.choices[1].message.content)
-		else
-			print("❌ Unexpected OpenAI API	response:")
-		end
-	else
-		print("❌ HTTP error: " .. tostring(response.status))
-	end
+			if return_val == 6 then
+				notify_async("❌ Host could not be resolved. Check your internet connection.", vim.log.levels.ERROR)
+				return
+			elseif return_val ~= 0 then
+				local msg = stderr ~= "" and stderr or "(no stderr output)"
+				notify_async("❌ HTTP request failed:\n" .. msg, vim.log.levels.ERROR)
+				return
+			end
+
+			if stdout == "" then
+				notify_async("❌ Empty response from API", vim.log.levels.ERROR)
+				return
+			end
+
+			local ok, decoded = pcall(vim.json.decode, stdout)
+			if not ok then
+				notify_async("❌ JSON decode failed", vim.log.levels.ERROR)
+				return
+			end
+
+			if decoded.error then
+				local msg = decoded.error.message or "Unknown API error"
+				notify_async("❌ OpenAI API error:\n" .. msg, vim.log.levels.ERROR)
+				return
+			end
+
+			if decoded.choices and decoded.choices[1] then
+				local msg = decoded.choices[1].message.content
+				vim.schedule(function()
+					callback(msg)
+				end)
+			else
+				notify_async("❌ No message content found.", vim.log.levels.ERROR)
+			end
+		end,
+	}):start()
 end
 
 function M.commit_from_lines(lines, reset_on_cancel)
@@ -304,7 +348,7 @@ function M.run()
 	-- Check for Git repo
 	local ok, err = M.ensure_git_repo()
 	if not ok then
-		show_floating_message(err)
+		print(err)
 		return
 	end
 
@@ -312,14 +356,14 @@ function M.run()
 	if config.options.auto_fetch then
 		local ok_remote, err_remote = M.check_remote_status()
 		if not ok_remote then
-			show_floating_message(err_remote)
+			print(err_remote)
 			return
 		end
 	end
 
 	-- Check for changes
 	if not git.has_changes_to_commit() then
-		show_floating_message("✅ No changes to commit.")
+		print("✅ No changes to commit.")
 		return
 	end
 
@@ -330,14 +374,14 @@ function M.run()
 		reset_on_cancel = true
 	elseif not git.has_staged_changes() then
 		--TODO: Add a staging UI
-		show_floating_message(" 🚫 Nothing staged. Stage something first.")
+		print(" 🚫 Nothing staged. Stage something first.")
 		return
 	end
 
 	-- Get diff of staged changes
 	local diff = vim.fn.system("git diff --cached")
 	if diff == "" then
-		show_floating_message("❌ No staged changes found.")
+		print("❌ No staged changes found.")
 		return
 	end
 
