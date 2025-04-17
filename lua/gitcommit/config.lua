@@ -3,7 +3,7 @@ local M = {}
 
 M.options = {
 	stage_all = true, -- Stage all changes before generating commit message
-	auto_fetch = true, -- Fetch before pushing (if tracking branch exists)
+   auto_fetch = false, -- Fetch before pushing (if tracking branch exists). Disable to avoid blocking UI by default.
 	prompt_after_commit = true, -- Prompt to push after committing
 	model = "gpt-4o-mini",
 	temperature = 0.7,

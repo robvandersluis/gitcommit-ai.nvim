@@ -86,35 +86,43 @@ function M.generate_commit_message(diff, callback)
 end
 
 function M.commit_from_lines(lines, reset_on_cancel)
-	local trimmed = vim.tbl_filter(function(line)
-		return line:match("%S") -- check for any non-whitespace
-	end, lines)
+ 	local trimmed = vim.tbl_filter(function(line)
+ 		return line:match("%S")
+ 	end, lines)
 
-	if #trimmed == 0 then
-		vim.notify("❌ Commit aborted: message is empty", vim.log.levels.WARN)
-		if reset_on_cancel then
-			vim.fn.system("git reset HEAD")
-		end
-		return
-	end
+ 	if #trimmed == 0 then
+ 		notify_async("❌ Commit aborted: message is empty", vim.log.levels.WARN)
+ 		if reset_on_cancel then
+ 			Job:new({ command = "git", args = { "reset", "HEAD" } }):start()
+ 		end
+ 		return
+ 	end
 
-	local tmpfile = vim.fn.tempname()
-	vim.fn.writefile(lines, tmpfile)
-	local out = vim.fn.system({ "git", "commit", "-F", tmpfile })
+ 	local tmpfile = vim.fn.tempname()
+ 	vim.fn.writefile(lines, tmpfile)
 
-	os.remove(tmpfile)
-	if vim.v.shell_error ~= 0 then
-		vim.notify("⚠️ Git commit failed:\n" .. out, vim.log.levels.ERROR)
-		if reset_on_cancel then
-			vim.fn.system("git reset HEAD")
-		end
-	else
-		vim.notify(out, vim.log.levels.INFO)
-		if config.options.prompt_after_commit then
-			M.prompt_push()
-		end
-	end
-end
+ 	Job:new({
+ 		command = "git",
+ 		args = { "commit", "-F", tmpfile },
+ 		on_exit = function(job, exit_code)
+ 			local out = table.concat(job:result(), "\n")
+ 			pcall(os.remove, tmpfile)
+ 			vim.schedule(function()
+ 				if exit_code ~= 0 then
+ 					vim.notify("⚠️ Git commit failed:\n" .. out, vim.log.levels.ERROR)
+ 					if reset_on_cancel then
+ 						Job:new({ command = "git", args = { "reset", "HEAD" } }):start()
+ 					end
+ 				else
+ 					vim.notify(out, vim.log.levels.INFO)
+ 					if config.options.prompt_after_commit then
+ 						M.prompt_push()
+ 					end
+ 				end
+ 			end)
+ 		end,
+ 	}):start()
+ end
 
 function M.commit_with_message(msg, reset_on_cancel)
 	M.commit_from_lines(vim.split(msg, "\n"), reset_on_cancel)
@@ -161,21 +169,30 @@ function M.open_commit_buffer(msg, reset_on_cancel)
 end
 
 function M.prompt_push()
-	if git.can_push() then
-		local target = git.get_tracking_branch() or "remote"
-		local prompt_title = "Push to tracking branch [" .. target .. "]?"
+   if git.can_push() then
+       local target = git.get_tracking_branch() or "remote"
+       local prompt_title = "Push to tracking branch [" .. target .. "]?"
 
-		vim.schedule(function()
-			vim.ui.select({ "Yes", "No" }, { prompt = prompt_title }, function(choice)
-				if choice == "Yes" then
-					local push_out = vim.fn.system({ "git", "push" })
-					vim.notify(push_out, vim.log.levels.INFO)
-				else
-					vim.notify("🚀 Push skipped.", vim.log.levels.INFO)
-				end
-			end)
-		end)
-	end
+       vim.schedule(function()
+           vim.ui.select({ "Yes", "No" }, { prompt = prompt_title }, function(choice)
+               if choice == "Yes" then
+                   -- Push asynchronously
+                   Job:new({
+                       command = "git",
+                       args = { "push" },
+                       on_exit = function(job, exit_code)
+                           local out = table.concat(job:result(), "\n")
+                           vim.schedule(function()
+                               vim.notify(out, vim.log.levels.INFO)
+                           end)
+                       end,
+                   }):start()
+               else
+                   vim.notify("🚀 Push skipped.", vim.log.levels.INFO)
+               end
+           end)
+       end)
+   end
 end
 
 -- Shows a floating window with the commit message and key bindings
