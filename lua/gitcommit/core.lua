@@ -20,6 +20,12 @@ function M.generate_commit_message(diff, callback)
 		return
 	end
 
+	-- Retrieve timeout for API requests (in seconds)
+	local timeout = config.options.timeout or 30
+
+	-- Notify user that generation has started
+	notify_async("🔄 Generating commit message... (timeout: " .. timeout .. "s)")
+
 	local payload = {
 		model = config.options.model,
 		messages = {
@@ -33,6 +39,7 @@ function M.generate_commit_message(diff, callback)
 		command = "curl",
 		args = {
 			"-sS",
+			"--max-time", tostring(timeout),
 			"-X",
 			"POST",
 			"-H",
@@ -41,7 +48,7 @@ function M.generate_commit_message(diff, callback)
 			"Authorization: Bearer " .. api_key,
 			"--data",
 			vim.fn.json_encode(payload),
-			"https://api.openai.com/v1/chat/completions",
+ 			"https://api.openai.com/v1/chat/completions",
 		},
 		on_exit = function(j, return_val)
 			local stdout = table.concat(j:result(), "\n")
@@ -49,6 +56,9 @@ function M.generate_commit_message(diff, callback)
 
 			if return_val == 6 then
 				notify_async("❌ Host could not be resolved. Check your internet connection.", vim.log.levels.ERROR)
+				return
+			elseif return_val == 28 then
+				notify_async("❌ OpenAI request timed out after " .. timeout .. " seconds.", vim.log.levels.ERROR)
 				return
 			elseif return_val ~= 0 then
 				local msg = stderr ~= "" and stderr or "(no stderr output)"

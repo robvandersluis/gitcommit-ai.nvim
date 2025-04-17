@@ -6,7 +6,9 @@ M.options = {
    auto_fetch = false, -- Fetch before pushing (if tracking branch exists). Disable to avoid blocking UI by default.
 	prompt_after_commit = true, -- Prompt to push after committing
 	model = "gpt-4o-mini",
-	temperature = 0.7,
+ 	temperature = 0.7,
+ 	-- Maximum time (in seconds) to wait for OpenAI API response
+ 	timeout = 30,
 	system_prompt = [[
 You are an assistant that only generates git commit messages.
 Use one of the following prefixes:
